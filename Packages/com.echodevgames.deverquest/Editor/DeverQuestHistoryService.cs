@@ -25,10 +25,6 @@ namespace EchoDevGames.DeverQuest
         public string DataPath = string.Empty;
         public string MarkdownPath = string.Empty;
         public DeverQuestDailyRecord Record;
-        public DeverQuestIntegrityStatus IntegrityStatus;
-        public string IntegrityMessage = string.Empty;
-        public int SuspiciousSessionCount;
-        public bool SuspiciousFrequency;
     }
 
     internal sealed class DeverQuestHistorySummary
@@ -116,23 +112,6 @@ namespace EchoDevGames.DeverQuest
                     TryLoadDay(dataPath);
                 }
 
-                int frequencyLimit =
-                    profile.suspiciousDailyQuestCount;
-                if (frequencyLimit > 0)
-                {
-                    foreach (IGrouping<DateTime, DeverQuestHistoryDay> group
-                             in Days.GroupBy(day => day.Date.Date))
-                    {
-                        bool flagged = group.Sum(
-                            day => day.Record.sessions.Count) >=
-                            frequencyLimit;
-                        foreach (DeverQuestHistoryDay day in group)
-                        {
-                            day.SuspiciousFrequency = flagged;
-                        }
-                    }
-                }
-
                 Days.Sort(
                     (left, right) =>
                         right.Date.CompareTo(left.Date));
@@ -200,17 +179,8 @@ namespace EchoDevGames.DeverQuest
                             developerName =
                                 day.Record.developerName,
                             localDate = day.Record.localDate,
-                            chronicleIndex =
-                                day.Record.chronicleIndex,
                             sessions = matchingSessions
-                        },
-                        IntegrityStatus = day.IntegrityStatus,
-                        IntegrityMessage = day.IntegrityMessage,
-                        SuspiciousSessionCount =
-                            matchingSessions.Count(
-                                IsSuspiciousSession),
-                        SuspiciousFrequency =
-                            day.SuspiciousFrequency
+                        }
                     });
             }
 
@@ -551,22 +521,13 @@ namespace EchoDevGames.DeverQuest
                           ".md"
                         : Path.ChangeExtension(dataPath, ".md");
 
-                DeverQuestIntegrityStatus integrityStatus =
-                    DeverQuestChronicleIntegrityService.Verify(
-                        dataPath,
-                        out string integrityMessage);
-
                 Days.Add(
                     new DeverQuestHistoryDay
                     {
                         Date = date,
                         DataPath = dataPath,
                         MarkdownPath = markdownPath,
-                        Record = record,
-                        IntegrityStatus = integrityStatus,
-                        IntegrityMessage = integrityMessage,
-                        SuspiciousSessionCount =
-                            record.sessions.Count(IsSuspiciousSession)
+                        Record = record
                     });
             }
             catch (Exception exception)
@@ -611,16 +572,6 @@ namespace EchoDevGames.DeverQuest
                    (value ?? string.Empty).IndexOf(
                        filter,
                        StringComparison.OrdinalIgnoreCase) >= 0;
-        }
-
-        private static bool IsSuspiciousSession(
-            DeverQuestSession session)
-        {
-            DeverQuestProfile profile =
-                DeverQuestSettingsStore.Profile;
-            return profile.suspiciousQuestMinutes > 0 &&
-                   session.accumulatedFocusedSeconds >=
-                   profile.suspiciousQuestMinutes * 60d;
         }
 
         private static DateTime GetWeekStart(DateTime date)

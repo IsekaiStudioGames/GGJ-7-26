@@ -19,8 +19,6 @@ namespace EchoDevGames.DeverQuest
     {
         [SerializeField]
         private List<AudioClip> tracks = new List<AudioClip>();
-        [SerializeField]
-        private List<int> trackWeights = new List<int>();
 
         [SerializeField]
         private bool shuffle;
@@ -66,15 +64,6 @@ namespace EchoDevGames.DeverQuest
             return tracks[index];
         }
 
-        public int GetTrackWeight(int index)
-        {
-            return trackWeights != null &&
-                   index >= 0 &&
-                   index < trackWeights.Count
-                ? Mathf.Max(1, trackWeights[index])
-                : 1;
-        }
-
         private void OnValidate()
         {
             volume = Mathf.Clamp01(volume);
@@ -82,24 +71,6 @@ namespace EchoDevGames.DeverQuest
             if (tracks == null)
             {
                 tracks = new List<AudioClip>();
-            }
-            trackWeights = trackWeights ?? new List<int>();
-            while (trackWeights.Count < tracks.Count)
-            {
-                trackWeights.Add(1);
-            }
-            if (trackWeights.Count > tracks.Count)
-            {
-                trackWeights.RemoveRange(
-                    tracks.Count,
-                    trackWeights.Count - tracks.Count);
-            }
-            for (int index = 0;
-                 index < trackWeights.Count;
-                 index++)
-            {
-                trackWeights[index] =
-                    Mathf.Max(1, trackWeights[index]);
             }
         }
     }

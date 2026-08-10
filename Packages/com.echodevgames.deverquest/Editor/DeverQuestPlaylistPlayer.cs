@@ -38,7 +38,6 @@ namespace EchoDevGames.DeverQuest
         private static int trackIndex;
         private static double trackStartedEditorTime;
         private static bool pausedBySession;
-        private static AudioClip playingClip;
         private static double notPlayingObservedSince = -1d;
 
         public static DeverQuestPlaybackState State { get; private set; }
@@ -69,42 +68,6 @@ namespace EchoDevGames.DeverQuest
             playlist?.GetTrack(trackIndex);
 
         public static int TrackIndex => trackIndex;
-
-        public static void SelectTrack(int index)
-        {
-            if (playlist == null || playlist.TrackCount <= 0)
-            {
-                return;
-            }
-
-            index = Mathf.Clamp(index, 0, playlist.TrackCount - 1);
-            if (index == trackIndex)
-            {
-                return;
-            }
-
-            bool resumePlayback =
-                State == DeverQuestPlaybackState.Playing;
-            Stop();
-            trackIndex = index;
-            TrackHistory.Clear();
-            ShuffleVisited.Clear();
-            SaveSelection();
-
-            if (resumePlayback)
-            {
-                PlayCurrent();
-            }
-        }
-
-        public static void ClearPlaybackState()
-        {
-            playingClip = null;
-            State = DeverQuestPlaybackState.Stopped;
-            pausedBySession = false;
-            notPlayingObservedSince = -1d;
-            LastError = string.Empty;
-        }
 
         public static void SetPlaylist(DeverQuestPlaylist value)
         {
@@ -146,8 +109,7 @@ namespace EchoDevGames.DeverQuest
                 return;
             }
 
-            DeverQuestAudioTransport.Pause(
-                DeverQuestEditorAudioChannel.Music);
+            DeverQuestEditorAudioBridge.Pause();
             State = DeverQuestPlaybackState.Paused;
         }
 
@@ -158,8 +120,7 @@ namespace EchoDevGames.DeverQuest
                 return;
             }
 
-            DeverQuestAudioTransport.Resume(
-                DeverQuestEditorAudioChannel.Music);
+            DeverQuestEditorAudioBridge.Resume();
             State = DeverQuestPlaybackState.Playing;
             trackStartedEditorTime =
                 EditorApplication.timeSinceStartup;
@@ -167,12 +128,7 @@ namespace EchoDevGames.DeverQuest
 
         public static void Stop()
         {
-            if (playingClip != null)
-            {
-                DeverQuestAudioTransport.Stop(
-                    DeverQuestEditorAudioChannel.Music);
-            }
-            playingClip = null;
+            DeverQuestEditorAudioBridge.Stop();
             State = DeverQuestPlaybackState.Stopped;
             pausedBySession = false;
             notPlayingObservedSince = -1d;
@@ -232,8 +188,8 @@ namespace EchoDevGames.DeverQuest
         {
             if (playlist != null && CurrentTrack != null)
             {
-                DeverQuestAudioTransport.SetVolume(
-                    DeverQuestEditorAudioChannel.Music,
+                DeverQuestEditorAudioBridge.SetVolume(
+                    CurrentTrack,
                     playlist.Volume);
             }
         }
@@ -252,8 +208,7 @@ namespace EchoDevGames.DeverQuest
             bool loop =
                 playlist.RepeatMode == DeverQuestRepeatMode.One;
 
-            if (!DeverQuestAudioTransport.Play(
-                    DeverQuestEditorAudioChannel.Music,
+            if (!DeverQuestEditorAudioBridge.Play(
                     clip,
                     loop,
                     playlist.Volume))
@@ -265,7 +220,6 @@ namespace EchoDevGames.DeverQuest
             }
 
             LastError = string.Empty;
-            playingClip = clip;
             State = DeverQuestPlaybackState.Playing;
             pausedBySession = false;
             trackStartedEditorTime =
@@ -334,19 +288,7 @@ namespace EchoDevGames.DeverQuest
                             .ToList();
                 }
 
-                int totalWeight = candidates.Sum(
-                    index => playlist.GetTrackWeight(index));
-                int choice = Random.Next(
-                    Math.Max(1, totalWeight));
-                foreach (int candidate in candidates)
-                {
-                    choice -= playlist.GetTrackWeight(candidate);
-                    if (choice < 0)
-                    {
-                        return candidate;
-                    }
-                }
-                return candidates[candidates.Count - 1];
+                return candidates[Random.Next(candidates.Count)];
             }
 
             int sequentialIndex = trackIndex + 1;
@@ -375,10 +317,10 @@ namespace EchoDevGames.DeverQuest
                 return false;
             }
 
-            if (!DeverQuestAudioTransport.IsAvailable)
+            if (!DeverQuestEditorAudioBridge.IsAvailable)
             {
                 LastError =
-                    "No DeverQuest Editor audio transport is available.";
+                    "Unity editor preview audio is unavailable.";
                 return false;
             }
 
@@ -388,7 +330,7 @@ namespace EchoDevGames.DeverQuest
         private static void Update()
         {
             if (State != DeverQuestPlaybackState.Playing ||
-                !DeverQuestAudioTransport.PlaybackStatusSupported ||
+                !DeverQuestEditorAudioBridge.PlaybackStatusSupported ||
                 CurrentTrack == null ||
                 !InternalEditorUtility.isApplicationActive ||
                 EditorApplication.timeSinceStartup -
@@ -398,14 +340,21 @@ namespace EchoDevGames.DeverQuest
                 return;
             }
 
-            if (DeverQuestAudioTransport.IsPlaying(
-                    DeverQuestEditorAudioChannel.Music))
+            if (DeverQuestEditorAudioBridge.IsPlaying(CurrentTrack))
             {
                 notPlayingObservedSince = -1d;
                 return;
             }
 
             double now = EditorApplication.timeSinceStartup;
+            double expectedEnd =
+                trackStartedEditorTime +
+                Math.Max(0.5d, CurrentTrack.length - 0.5d);
+
+            if (now < expectedEnd)
+            {
+                return;
+            }
 
             if (notPlayingObservedSince < 0d)
             {

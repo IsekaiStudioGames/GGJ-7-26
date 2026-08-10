@@ -120,82 +120,25 @@ namespace EchoDevGames.DeverQuest
 
             EnsureDefaults();
 
-            int baseCopper = session.usesQuestProfile
-                ? session.questBaseCopper
-                : profile.baseQuestCopper;
-            int baseExperience = session.usesQuestProfile
-                ? session.questBaseExperience
-                : profile.baseQuestExperience;
-            int workBlockMinutes = session.usesQuestProfile
-                ? Math.Max(1, session.questWorkBlockMinutes)
-                : profile.rewardWorkBlockMinutes;
-            int copperPerBlock = session.usesQuestProfile
-                ? session.questCopperPerWorkBlock
-                : profile.copperPerWorkBlock;
-            int experiencePerBlock = session.usesQuestProfile
-                ? session.questExperiencePerWorkBlock
-                : profile.experiencePerWorkBlock;
-
-            AwardProgression(
-                session,
-                baseCopper,
-                baseExperience,
-                "Quest Completion",
-                "Quest successfully turned in");
-
-            DeverQuestQuestContract rewardContract =
-                DeverQuestContractService.Find(
-                    session.questContractId);
-            bool fullParty =
-                rewardContract != null &&
-                rewardContract.partyMembers.Count >=
-                rewardContract.maximumParticipants;
-            if (session.questIsGroupQuest &&
-                fullParty &&
-                (session.questGroupBonusCopper > 0 ||
-                 session.questGroupBonusExperience > 0))
-            {
-                AwardProgression(
-                    session,
-                    session.questGroupBonusCopper,
-                    session.questGroupBonusExperience,
-                    "Party Bonus",
-                    "Group Quest participation bonus");
-            }
+            Wallet.unrewardedWorkSeconds +=
+                session.accumulatedFocusedSeconds;
 
             double blockSeconds =
-                Math.Max(60d, workBlockMinutes * 60d);
-
-            double rewardableSeconds;
-            if (session.usesQuestProfile)
-            {
-                rewardableSeconds =
-                    session.accumulatedFocusedSeconds;
-            }
-            else
-            {
-                Wallet.unrewardedWorkSeconds +=
-                    session.accumulatedFocusedSeconds;
-                rewardableSeconds =
-                    Wallet.unrewardedWorkSeconds;
-            }
+                Math.Max(60d, profile.rewardWorkBlockMinutes * 60d);
 
             int completedBlocks =
                 (int)Math.Floor(
-                    rewardableSeconds / blockSeconds);
+                    Wallet.unrewardedWorkSeconds / blockSeconds);
 
             if (completedBlocks > 0)
             {
-                if (!session.usesQuestProfile)
-                {
-                    Wallet.unrewardedWorkSeconds -=
-                        completedBlocks * blockSeconds;
-                }
+                Wallet.unrewardedWorkSeconds -=
+                    completedBlocks * blockSeconds;
 
                 AwardProgression(
                     session,
-                    completedBlocks * (long)copperPerBlock,
-                    completedBlocks * (long)experiencePerBlock,
+                    completedBlocks * (long)profile.copperPerWorkBlock,
+                    completedBlocks * (long)profile.experiencePerWorkBlock,
                     "Work Block",
                     $"{completedBlocks} completed work block(s)");
             }
