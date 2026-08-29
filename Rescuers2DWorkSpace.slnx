@@ -1,5 +1,3 @@
 ﻿<Solution>
   <Project Path="Assembly-CSharp.csproj" />
-  <Project Path="EchoDevGames.DeverQuest.Editor.csproj" />
-  <Project Path="EchoDevGames.DeverQuest.Runtime.csproj" />
 </Solution>
